@@ -4,7 +4,9 @@ import { clerkClient } from "@clerk/express";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
-import  pdf  from "pdf-parse";
+// import  pdf  from "pdf-parse";
+import pdf from "../pdfParseFixed.js";
+
 // const { default: pdf } = await import("pdf-parse");
 
 
