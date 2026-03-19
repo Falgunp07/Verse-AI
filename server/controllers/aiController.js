@@ -14,11 +14,13 @@ const AI = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY?.trim(),
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
-const AI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+const AI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 const AI_MODELS = [
     ...new Set(
         [
             AI_MODEL,
+            "gemini-flash-latest",
+            "gemini-3-flash-preview",
             "gemini-2.5-flash",
             "gemini-1.5-flash",
         ].filter(Boolean)
