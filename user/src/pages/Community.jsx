@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 
 
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL;
+axios.defaults.baseURL = (import.meta.env.VITE_BASE_URL || '').trim();
 
 
 const Community = () => {
@@ -38,7 +38,7 @@ const Community = () => {
 
   const imageLikeToggle = async (id)=>{
     try {
-       const { data } = await axios.post('/api/ai/toggle-like-creations',{id}, {
+       const { data } = await axios.post('/api/user/toggle-like-creations',{id}, {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
 
@@ -49,7 +49,7 @@ const Community = () => {
         toast.error(data.message)
       }
     } catch (error) {
-      toast.success(error.message)
+      toast.error(error.message)
       
     }
   }

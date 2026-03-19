@@ -1,26 +1,20 @@
-import { clerkClient } from "@clerk/express";
-
-
-export const auth = async (req,resizeBy,next)=>{
+export const auth = async (req, res, next) => {
     try {
-        const {userId, has} = await req.auth();
-        const hasPremiumPlan = await has({plan: 'premium'});
+        const authData = req.auth();
+        const { userId, has, sessionClaims } = authData;
 
-        const user = await clerkClient.users.getUser(userId);
-
-        if(!hasPremiumPlan && user.privateMetadata.free_usage){
-            req.free_usage = user.privateMetadata.free_usage
-        } else {
-            await clerkClient.users.updateUserMetadata(userId ,{
-                privateMetadata: {
-                    free_usage: 0
-                }
-            })
-            req.free_usage = 0;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
         }
-        req.plan = hasPremiumPlan ? 'premium' : 'free'
-        next()
+
+        const hasPremiumPlan = has ? await has({ plan: "premium" }) : false;
+        const freeUsageFromClaims = Number(sessionClaims?.metadata?.free_usage ?? 0);
+
+        req.free_usage = Number.isNaN(freeUsageFromClaims) ? 0 : freeUsageFromClaims;
+        req.plan = hasPremiumPlan ? "premium" : "free";
+        next();
     } catch (error) {
-        res.json({success: false, message: error.message })
+        const status = error?.status || 500;
+        res.status(status).json({ success: false, message: error?.message || "Authentication failed" });
     }
 }

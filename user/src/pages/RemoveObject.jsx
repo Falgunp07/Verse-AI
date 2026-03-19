@@ -4,7 +4,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast';
 import { useAuth } from '@clerk/clerk-react';
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL;
+axios.defaults.baseURL = (import.meta.env.VITE_BASE_URL || '').trim();
 
 
 const RemoveObject = () => {

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@clerk/clerk-react';
 import Markdown from 'react-markdown';
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL;
+axios.defaults.baseURL = (import.meta.env.VITE_BASE_URL || '').trim();
 
 const ReviewResume = () => {
   const [input, setInput] = useState('')

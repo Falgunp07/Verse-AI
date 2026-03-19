@@ -4,17 +4,89 @@ import { clerkClient } from "@clerk/express";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
-// import  pdf  from "pdf-parse";
-import pdf from "../pdfParseFixed.js";
+import  pdf  from "pdf-parse";
 
 // const { default: pdf } = await import("pdf-parse");
 
 
 
 const AI = new OpenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey: process.env.GEMINI_API_KEY?.trim(),
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
+const AI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+const AI_MODELS = [
+    ...new Set(
+        [
+            AI_MODEL,
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+        ].filter(Boolean)
+    ),
+];
+
+const pickProviderErrorMessage = (error) => {
+    return (
+        error?.error?.message ||
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message
+    );
+};
+
+const getAiErrorMessage = (error) => {
+    const providerMessage = pickProviderErrorMessage(error);
+
+    if (error?.status === 429) {
+        return providerMessage
+            ? `AI rate limit/quota reached: ${providerMessage}`
+            : "AI quota/rate limit reached. Please try again in a minute or update your API quota.";
+    }
+    return providerMessage || "Something went wrong while generating AI content.";
+};
+
+const incrementFreeUsageSafely = async (userId, free_usage) => {
+    try {
+        await clerkClient.users.updateUserMetadata(userId, {
+            privateMetadata: {
+                free_usage: free_usage + 1
+            }
+        });
+    } catch (error) {
+        console.log("Failed to update free usage metadata:", error?.message);
+    }
+};
+
+const createCompletionWithFallback = async ({ messages, temperature, max_tokens }) => {
+    let lastError;
+
+    for (const model of AI_MODELS) {
+        try {
+            const response = await AI.chat.completions.create({
+                model,
+                messages,
+                temperature,
+                max_tokens,
+            });
+
+            return response;
+        } catch (error) {
+            lastError = error;
+            console.log(`Model ${model} failed:`, {
+                status: error?.status,
+                message: pickProviderErrorMessage(error),
+            });
+
+            const retryable = error?.status === 429 || error?.status === 503;
+            if (!retryable) {
+                throw error;
+            }
+        }
+    }
+
+    throw lastError;
+};
 
 export const generateArticle = async (req, res) => {
     try {
@@ -28,16 +100,15 @@ export const generateArticle = async (req, res) => {
 
         }
 
-        const response = await AI.chat.completions.create({
-            model: "gemini-2.0-flash",
+        const response = await createCompletionWithFallback({
             messages: [{
                 role: "user",
                 content: prompt,
-            },
-            ],
+            }],
             temperature: 0.7,
             max_tokens: length,
         });
+        
 
         const content = response.choices[0].message.content
 
@@ -45,17 +116,16 @@ export const generateArticle = async (req, res) => {
         VALUES (${userId}, ${prompt}, ${content}, 'article')`;
 
         if (plan !== 'premium') {
-            await clerkClient.users.updateUserMetadata(userId, {
-                privateMetadata: {
-                    free_usage: free_usage + 1
-                }
-            })
+            await incrementFreeUsageSafely(userId, free_usage);
         }
         res.json({ success: true, content })
 
     } catch (error) {
-        console.log(error.message);
-        res.json({ success: false, message: error.message })
+        console.log("generateArticle error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
+        res.json({ success: false, message: getAiErrorMessage(error) })
 
     }
 }
@@ -72,9 +142,8 @@ export const generateBlogTitle = async (req, res) => {
 
         }
 
-        const response = await AI.chat.completions.create({
-            model: "gemini-2.0-flash",
-            messages: [{ role: "user", content: prompt, }],
+        const response = await createCompletionWithFallback({
+            messages: [{ role: "user", content: prompt }],
             temperature: 0.7,
             max_tokens: 100,
         });
@@ -85,17 +154,16 @@ export const generateBlogTitle = async (req, res) => {
         VALUES (${userId}, ${prompt}, ${content}, 'blog-title')`;
 
         if (plan !== 'premium') {
-            await clerkClient.users.updateUserMetadata(userId, {
-                privateMetadata: {
-                    free_usage: free_usage + 1
-                }
-            })
+            await incrementFreeUsageSafely(userId, free_usage);
         }
         res.json({ success: true, content })
 
     } catch (error) {
-        console.log(error.message);
-        res.json({ success: false, message: error.message })
+        console.log("generateBlogTitle error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
+        res.json({ success: false, message: getAiErrorMessage(error) })
 
     }
 }
@@ -128,7 +196,10 @@ export const generateImage = async (req, res) => {
         res.json({ success: true, content: secure_url })
 
     } catch (error) {
-        console.log(error.message);
+        console.log("generateImage error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
         res.json({ success: false, message: error.message })
 
     }
@@ -159,8 +230,11 @@ export const removeImageBackground = async (req, res) => {
         res.json({ success: true, content: secure_url })
 
     } catch (error) {
-        console.log(error.message);
-        res.json({ success: false, message: error.message })
+        console.log("removeImageBackground error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
+        res.json({ success: false, message: getAiErrorMessage(error) })
     }
 }
 
@@ -188,7 +262,10 @@ export const removeImageObject = async (req, res) => {
         res.json({ success: true, content: imageUrl })
 
     } catch (error) {
-        console.log(error.message);
+        console.log("removeImageObject error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
         res.json({ success: false, message: error.message })
     }
 }
@@ -212,9 +289,8 @@ export const resumeReview = async (req, res) => {
 
         const prompt = `Review the following resume and provide constructive feedback on its strengths , weakness and areas for improvment. Resume Content:\n\n${pdfData.text}`
 
-          const response = await AI.chat.completions.create({
-            model: "gemini-2.0-flash",
-            messages: [{ role: "user", content: prompt, }],
+        const response = await createCompletionWithFallback({
+            messages: [{ role: "user", content: prompt }],
             temperature: 0.7,
             max_tokens: 1000,
         });
@@ -227,7 +303,10 @@ export const resumeReview = async (req, res) => {
         res.json({ success: true, content})
 
     } catch (error) {
-        console.log(error.message);
-        res.json({ success: false, message: error.message })
+        console.log("resumeReview error:", {
+            status: error?.status,
+            message: pickProviderErrorMessage(error),
+        });
+        res.json({ success: false, message: getAiErrorMessage(error) })
     }
 }

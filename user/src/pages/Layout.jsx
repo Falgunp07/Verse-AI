@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import {SignIn , useUser } from '@clerk/clerk-react'
+import verseLogo from '../assets/Verse.png'
 
 
 const Layout = () => {
@@ -13,7 +14,7 @@ const Layout = () => {
   return user ?  (
     <div className='flex flex-col items-start justify-start h-screen'>
       <nav className='w-full px-8 min-h-14 flex items-center justify-between border-b border-gray-200'>
-        <img src="src\assets\Verse.png" className='h-25 w-35 cursor-pointer' alt="" onClick={() => navigate('/')} />
+        <img src={verseLogo} className='h-25 w-35 cursor-pointer' alt="Verse AI" onClick={() => navigate('/')} />
         {
           sidebar ? <X onClick={() => setSidebar(false)} className='w-6 h-6 text-gray-600 sm:hidden' />
             : <Menu onClick={() => setSidebar(true)} className='w-6 h-6 text-gray-600 sm:hidden' />

@@ -1,5 +1,13 @@
 import sql from "../configs/db.js";
 
+export const getUserPlan = async (req, res) => {
+    try {
+        res.json({ success: true, plan: req.plan, free_usage: req.free_usage });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+}
+
 export const getUserCreations = async (req, res) => {
     try {
         const { userId } = req.auth()
@@ -46,7 +54,7 @@ export const toggleLikeCreation = async (req, res) => {
         let message;
 
         if(currentLikes.includes(userIdStr)){
-            updatedLikes = currentLikes.filter(()=>user !== userIdStr);
+            updatedLikes = currentLikes.filter((user) => user !== userIdStr);
             message = 'Creation Unliked'
         }else{
             updatedLikes = [...currentLikes, userIdStr]
